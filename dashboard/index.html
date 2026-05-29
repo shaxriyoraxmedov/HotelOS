@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HotelOS — Operatsiyalar Paneli</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #1a1d2e;
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #2d3748;
+        }
+
+        header h1 {
+            font-size: 22px;
+            color: #63b3ed;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #fc8181;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-dot.connected {
+            background: #68d391;
+        }
+
+        .ws-status {
+            font-size: 13px;
+            color: #a0aec0;
+            display: flex;
+            align-items: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            padding: 24px 32px;
+        }
+
+        .card {
+            background: #1a1d2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2d3748;
+        }
+
+        .card h2 {
+            font-size: 14px;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #63b3ed;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        .events-card {
+            grid-column: 1 / -1;
+        }
+
+        .event-list {
+            list-style: none;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #2d3748;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .event-item:last-child {
+            border-bottom: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .event-badge {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge-checkin      { background: #2b6cb0; color: #bee3f8; }
+        .badge-checkout     { background: #285e61; color: #b2f5ea; }
+        .badge-cleaning     { background: #744210; color: #fefcbf; }
+        .badge-order        { background: #553c9a; color: #e9d8fd; }
+        .badge-maintenance  { background: #742a2a; color: #fed7d7; }
+        .badge-default      { background: #2d3748; color: #e2e8f0; }
+
+        .event-text {
+            font-size: 13px;
+            color: #cbd5e0;
+            flex: 1;
+        }
+
+        .event-time {
+            font-size: 11px;
+            color: #4a5568;
+            white-space: nowrap;
+        }
+
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 8px;
+        }
+
+        .room-box {
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: default;
+            transition: transform 0.2s;
+        }
+
+        .room-box:hover { transform: scale(1.05); }
+
+        .room-clean       { background: #276749; color: #c6f6d5; }
+        .room-occupied    { background: #2b6cb0; color: #bee3f8; }
+        .room-dirty       { background: #744210; color: #fefcbf; }
+        .room-cleaning    { background: #b7791f; color: #fefcbf; }
+        .room-maintenance { background: #742a2a; color: #fed7d7; }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #a0aec0;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🏨 HotelOS — Operatsiyalar Paneli</h1>
+    <div class="ws-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Ulanmoqda...</span>
+    </div>
+</header>
+
+<div class="grid">
+
+    <!-- Statistika kartalar -->
+    <div class="card">
+        <h2>Faol Mehmonlar</h2>
+        <div class="stat-number" id="activeGuests">—</div>
+        <div class="stat-label">Hozir mehmonxonada</div>
+    </div>
+
+    <div class="card">
+        <h2>Bo'sh Xonalar</h2>
+        <div class="stat-number" id="cleanRooms">—</div>
+        <div class="stat-label">Tayyor xonalar</div>
+    </div>
+
+    <div class="card">
+        <h2>Tozalanmoqda</h2>
+        <div class="stat-number" id="cleaningRooms">—</div>
+        <div class="stat-label">Aktiv tozalash vazifalari</div>
+    </div>
+
+    <div class="card">
+        <h2>Texnik Muammolar</h2>
+        <div class="stat-number" id="pendingIssues">—</div>
+        <div class="stat-label">Hal qilinmagan muammolar</div>
+    </div>
+
+    <!-- Xonalar holati -->
+    <div class="card" style="grid-column: 1 / -1;">
+        <h2>Xonalar Holati</h2>
+        <div class="rooms-grid" id="roomsGrid">
+            <!-- JavaScript orqali to'ldiriladi -->
+        </div>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#276749"></div> Bo'sh
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#2b6cb0"></div> Band
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#744210"></div> Iflos
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#b7791f"></div> Tozalanmoqda
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:#742a2a"></div> Ta'mirlash
+            </div>
+        </div>
+    </div>
+
+    <!-- Hodisalar lenti -->
+    <div class="card events-card">
+        <h2>Hodisalar Lenti</h2>
+        <ul class="event-list" id="eventList">
+            <li class="event-item">
+                <span class="event-badge badge-default">TIZIM</span>
+                <span class="event-text">Panel ishga tushdi</span>
+                <span class="event-time" id="startTime"></span>
+            </li>
+        </ul>
+    </div>
+
+</div>
+
+<script>
+    const API = 'http://localhost:8000'
+    const WS_URL = 'ws://localhost:3000/ws/dashboard'
+
+    // -------------------------
+    // WebSocket ulanish
+    // -------------------------
+
+    let ws = null
+    let reconnectTimer = null
+
+    function connectWS() {
+        ws = new WebSocket(WS_URL)
+
+        ws.onopen = () => {
+            document.getElementById('statusDot').classList.add('connected')
+            document.getElementById('statusText').textContent = 'Ulangan'
+            clearTimeout(reconnectTimer)
+            loadInitialData()
+        }
+
+        ws.onclose = () => {
+            document.getElementById('statusDot').classList.remove('connected')
+            document.getElementById('statusText').textContent = 'Uzilib qoldi — qayta ulanmoqda...'
+            reconnectTimer = setTimeout(connectWS, 3000)
+        }
+
+        ws.onerror = () => {
+            ws.close()
+        }
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data)
+                handleEvent(data)
+            } catch (e) {
+                console.error('WebSocket xabari parse qilinmadi:', e)
+            }
+        }
+    }
+
+    // -------------------------
+    // Hodisalarni qayta ishlash
+    // -------------------------
+
+    function handleEvent(data) {
+        const { event, room_number } = data
+
+        addEventToFeed(data)
+
+        // Tegishli statistikani yangilash
+        switch (event) {
+            case 'checkin':
+                incrementStat('activeGuests')
+                updateRoomBox(room_number, 'occupied')
+                break
+
+            case 'checkout':
+                decrementStat('activeGuests')
+                updateRoomBox(room_number, 'dirty')
+                break
+
+            case 'cleaning_started':
+                incrementStat('cleaningRooms')
+                updateRoomBox(room_number, 'cleaning')
+                break
+
+            case 'room_cleaned':
+                decrementStat('cleaningRooms')
+                incrementStat('cleanRooms')
+                updateRoomBox(room_number, 'clean')
+                break
+
+            case 'maintenance_request':
+                incrementStat('pendingIssues')
+                updateRoomBox(room_number, 'maintenance')
+                break
+
+            case 'maintenance_completed':
+                decrementStat('pendingIssues')
+                break
+
+            case 'new_order':
+            case 'order_delivered':
+            case 'maintenance_assigned':
+                // Faqat event lentiga qo'shiladi
+                break
+        }
+    }
+
+    // -------------------------
+    // Hodisalar lenti
+    // -------------------------
+
+    const EVENT_LABELS = {
+        checkin:               { label: 'CHECK-IN',    cls: 'badge-checkin' },
+        checkout:              { label: 'CHECK-OUT',   cls: 'badge-checkout' },
+        cleaning_started:      { label: 'TOZALASH',    cls: 'badge-cleaning' },
+        room_cleaned:          { label: 'TOZA',        cls: 'badge-cleaning' },
+        new_order:             { label: 'BUYURTMA',    cls: 'badge-order' },
+        order_delivered:       { label: 'YETKAZILDI',  cls: 'badge-order' },
+        maintenance_request:   { label: 'TEXNIK',      cls: 'badge-maintenance' },
+        maintenance_completed: { label: 'HAL QILINDI', cls: 'badge-maintenance' },
+        maintenance_assigned:  { label: 'TAYINLANDI',  cls: 'badge-maintenance' },
+    }
+
+    function addEventToFeed(data) {
+        const list = document.getElementById('eventList')
+        const meta = EVENT_LABELS[data.event] || { label: 'XABAR', cls: 'badge-default' }
+
+        const text = buildEventText(data)
+        const time = new Date().toLocaleTimeString('uz-UZ')
+
+        const li = document.createElement('li')
+        li.className = 'event-item'
+        li.innerHTML = `
+            <span class="event-badge ${meta.cls}">${meta.label}</span>
+            <span class="event-text">${text}</span>
+            <span class="event-time">${time}</span>
+        `
+
+        list.insertBefore(li, list.firstChild)
+
+        // 50 tadan oshmasin
+        while (list.children.length > 50) {
+            list.removeChild(list.lastChild)
+        }
+    }
+
+    function buildEventText(data) {
+        switch (data.event) {
+            case 'checkin':
+                return `${data.guest_name || 'Mehmon'} — ${data.room_number} xonaga joylashdi`
+            case 'checkout':
+                return `${data.room_number} xona bo'shatildi`
+            case 'cleaning_started':
+                return `${data.room_number} xona tozalanmoqda` +
+                    (data.assigned_to ? ` (${data.assigned_to})` : '')
+            case 'room_cleaned':
+                return `${data.room_number} xona tozalandi`
+            case 'new_order':
+                return `${data.room_number} xona: ${data.item_name} buyurtma qilindi`
+            case 'order_delivered':
+                return `${data.room_number} xonaga buyurtma yetkazildi`
+            case 'maintenance_request':
+                return `${data.room_number} xona: ${data.description || 'texnik muammo'}`
+            case 'maintenance_completed':
+                return `${data.room_number} xona muammosi hal qilindi`
+            case 'maintenance_assigned':
+                return `${data.room_number} texnikka tayinlandi (${data.assigned_to})`
+            default:
+                return JSON.stringify(data)
+        }
+    }
+
+    // -------------------------
+    // Xona holati yangilash
+    // -------------------------
+
+    function updateRoomBox(roomNumber, status) {
+        const box = document.getElementById(`room-${roomNumber}`)
+        if (!box) return
+
+        box.className = `room-box room-${status}`
+    }
+
+    // -------------------------
+    // Statistika yordamchi
+    // -------------------------
+
+    function incrementStat(id) {
+        const el = document.getElementById(id)
+        const val = parseInt(el.textContent) || 0
+        el.textContent = val + 1
+    }
+
+    function decrementStat(id) {
+        const el = document.getElementById(id)
+        const val = parseInt(el.textContent) || 0
+        el.textContent = Math.max(0, val - 1)
+    }
+
+    // -------------------------
+    // Boshlang'ich ma'lumotlar
+    // -------------------------
+
+    async function loadInitialData() {
+        try {
+            // Xonalar
+            const roomsRes = await fetch(`${API}/api/reception/rooms`)
+            if (roomsRes.ok) {
+                const rooms = await roomsRes.json()
+                renderRooms(rooms)
+                updateStatsFromRooms(rooms)
+            }
+
+            // Mehmonlar
+            const guestsRes = await fetch(`${API}/api/reception/guests`)
+            if (guestsRes.ok) {
+                const guests = await guestsRes.json()
+                document.getElementById('activeGuests').textContent = guests.length
+            }
+
+            // Texnik muammolar
+            const issuesRes = await fetch(`${API}/api/maintenance/issues/pending`)
+            if (issuesRes.ok) {
+                const issues = await issuesRes.json()
+                document.getElementById('pendingIssues').textContent = issues.length
+            }
+
+        } catch (e) {
+            console.error('Boshlang\'ich ma\'lumotlar yuklanmadi:', e)
+        }
+    }
+
+    function renderRooms(rooms) {
+        const grid = document.getElementById('roomsGrid')
+        grid.innerHTML = ''
+
+        rooms.forEach(room => {
+            const div = document.createElement('div')
+            div.id = `room-${room.room_number}`
+            div.className = `room-box room-${room.status}`
+            div.textContent = room.room_number
+            div.title = `${room.room_number} — ${room.room_type} — ${room.status}`
+            grid.appendChild(div)
+        })
+    }
+
+    function updateStatsFromRooms(rooms) {
+        const clean = rooms.filter(r => r.status === 'clean').length
+        const cleaning = rooms.filter(r => r.status === 'cleaning').length
+        document.getElementById('cleanRooms').textContent = clean
+        document.getElementById('cleaningRooms').textContent = cleaning
+    }
+
+    // -------------------------
+    // Ishga tushirish
+    // -------------------------
+
+    document.getElementById('startTime').textContent = new Date().toLocaleTimeString('uz-UZ')
+    connectWS()
+</script>
+
+</body>
+</html>
