@@ -1,4 +1,4 @@
-# Reception Service v1.0 qo'shing
+# Reception Service v1.0 
 
 import os
 from contextlib import asynccontextmanager
