@@ -1,10 +1,11 @@
+# Reception Service v1.0 qo'shing
+
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from router import router
 from database import init_db, seed_db, AsyncSessionLocal
 from redis_client import broker
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
