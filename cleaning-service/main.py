@@ -1,11 +1,12 @@
-# Cleaning Service v1.0
-
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from router import router
 from database import init_db, seed_db, AsyncSessionLocal
 from redis_client import broker, Channels
-    
+
+# Global event loop
+_event_loop = None
+
 
 def on_room_vacated(data: dict) -> None:
     room_number = data.get("room_number")
@@ -14,7 +15,6 @@ def on_room_vacated(data: dict) -> None:
 
     print(f"[CLEANING] {room_number} xona bo'shatildi, tozalash vazifasi yaratilmoqda...")
 
-    import asyncio
     import uuid
     from datetime import datetime
     from models import CleaningTaskModel, CleanerModel, CleaningStatus
@@ -66,19 +66,18 @@ def on_room_vacated(data: dict) -> None:
                 "started_at": datetime.now().isoformat()
             })
 
-    # FastAPI event loop ni olish
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.run_coroutine_threadsafe(_create_task(), loop)
-        else:
-            loop.run_until_complete(_create_task())
-    except Exception as e:
-        print(f"[CLEANING] Event loop xatosi: {e}")
+    global _event_loop
+    if _event_loop is not None:
+        asyncio.run_coroutine_threadsafe(_create_task(), _event_loop)
+    else:
+        print("[CLEANING] Event loop topilmadi!")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _event_loop
+    _event_loop = asyncio.get_event_loop()
+
     print("[CLEANING] Servis ishga tushmoqda...")
 
     await init_db()
@@ -86,9 +85,7 @@ async def lifespan(app: FastAPI):
     async with AsyncSessionLocal() as session:
         await seed_db(session)
 
-    # Avval subscribe — keyin start!
     broker.subscribe(Channels.ROOM_VACATED, on_room_vacated)
-
     broker.start()
 
     print("[CLEANING] Servis tayyor")
@@ -105,6 +102,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+from router import router
 app.include_router(router, prefix="/api/cleaning", tags=["Cleaning"])
 
 
