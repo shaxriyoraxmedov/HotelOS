@@ -79,24 +79,17 @@ def on_room_vacated(data: dict) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    FastAPI ishga tushganda va to'xtaganda bajariladigan amallar.
-    """
-
     print("[CLEANING] Servis ishga tushmoqda...")
 
-    # Jadvallar yaratish
     await init_db()
 
-    # Namuna ma'lumotlar yuklash
     async with AsyncSessionLocal() as session:
         await seed_db(session)
 
-    # Broker ishga tushirish
-    broker.start()
-
-    # Reception-service dan xabarlarni tinglash
+    # Avval subscribe — keyin start!
     broker.subscribe(Channels.ROOM_VACATED, on_room_vacated)
+
+    broker.start()
 
     print("[CLEANING] Servis tayyor")
 
