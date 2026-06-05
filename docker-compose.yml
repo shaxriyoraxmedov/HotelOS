@@ -1,11 +1,7 @@
-# HotelOS Docker Configuration
-
-version: "3.9"
-
 services:
 
   # -------------------------
-  # Message Broker
+  # Redis
   # -------------------------
   redis:
     image: redis:7-alpine
@@ -27,6 +23,11 @@ services:
     ports:
       - "5433:5432"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reception_user -d reception_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   reception-service:
     build: ./reception-service
@@ -37,8 +38,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://reception_user:reception_pass@reception-db:5432/reception_db
       REDIS_URL: redis://redis:6379
     depends_on:
-      - reception-db
-      - redis
+      reception-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: always
 
   # -------------------------
@@ -54,6 +57,11 @@ services:
     ports:
       - "5434:5432"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cleaning_user -d cleaning_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   cleaning-service:
     build: ./cleaning-service
@@ -64,8 +72,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://cleaning_user:cleaning_pass@cleaning-db:5432/cleaning_db
       REDIS_URL: redis://redis:6379
     depends_on:
-      - cleaning-db
-      - redis
+      cleaning-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: always
 
   # -------------------------
@@ -81,6 +91,11 @@ services:
     ports:
       - "5435:5432"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U room_user -d room_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   room-service:
     build: ./room-service
@@ -91,8 +106,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://room_user:room_pass@room-db:5432/room_db
       REDIS_URL: redis://redis:6379
     depends_on:
-      - room-db
-      - redis
+      room-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: always
 
   # -------------------------
@@ -108,6 +125,11 @@ services:
     ports:
       - "5436:5432"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maintenance_user -d maintenance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   maintenance-service:
     build: ./maintenance-service
@@ -118,25 +140,15 @@ services:
       DATABASE_URL: postgresql+asyncpg://maintenance_user:maintenance_pass@maintenance-db:5432/maintenance_db
       REDIS_URL: redis://redis:6379
     depends_on:
-      - maintenance-db
-      - redis
+      maintenance-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: always
 
   # -------------------------
-  # Dashboard
+  # API Gateway
   # -------------------------
-  dashboard:
-    build: ./dashboard
-    container_name: hotelos-dashboard
-    ports:
-      - "3000:80"
-    depends_on:
-      - reception-service
-      - cleaning-service
-      - room-service
-      - maintenance-service
-    restart: always
-
   api-gateway:
     build: ./api-gateway
     container_name: hotelos-api-gateway
@@ -152,4 +164,19 @@ services:
       - cleaning-service
       - room-service
       - maintenance-service
+    restart: always
+
+  # -------------------------
+  # Dashboard
+  # -------------------------
+  dashboard:
+    build: ./dashboard
+    container_name: hotelos-dashboard
+    ports:
+      - "3000:80"
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_started
     restart: always
