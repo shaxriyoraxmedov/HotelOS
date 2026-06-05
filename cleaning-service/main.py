@@ -8,23 +8,20 @@ from redis_client import broker, Channels
     
 
 def on_room_vacated(data: dict) -> None:
-    """
-    Sinxron wrapper — broker thread dan async funksiyani chaqirish uchun
-    """
-    import asyncio
     room_number = data.get("room_number")
     if not room_number:
         return
 
     print(f"[CLEANING] {room_number} xona bo'shatildi, tozalash vazifasi yaratilmoqda...")
 
+    import asyncio
+    import uuid
+    from datetime import datetime
+    from models import CleaningTaskModel, CleanerModel, CleaningStatus
+    from sqlalchemy import select, update
+
     async def _create_task():
         async with AsyncSessionLocal() as session:
-            from models import CleaningTaskModel, CleanerModel, CleaningStatus
-            from sqlalchemy import select, update
-            import uuid
-            from datetime import datetime
-
             result = await session.execute(
                 select(CleaningTaskModel).where(
                     CleaningTaskModel.room_number == room_number,
@@ -60,6 +57,7 @@ def on_room_vacated(data: dict) -> None:
                 )
 
             await session.commit()
+            print(f"[CLEANING] {room_number} tozalash vazifasi yaratildi")
 
             broker.publish(Channels.DASHBOARD_UPDATE, {
                 "event": "cleaning_started",
@@ -68,13 +66,15 @@ def on_room_vacated(data: dict) -> None:
                 "started_at": datetime.now().isoformat()
             })
 
-            print(f"[CLEANING] {room_number} tozalash vazifasi yaratildi")
-
-    loop = asyncio.new_event_loop()
+    # FastAPI event loop ni olish
     try:
-        loop.run_until_complete(_create_task())
-    finally:
-        loop.close()
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.run_coroutine_threadsafe(_create_task(), loop)
+        else:
+            loop.run_until_complete(_create_task())
+    except Exception as e:
+        print(f"[CLEANING] Event loop xatosi: {e}")
 
 
 @asynccontextmanager
