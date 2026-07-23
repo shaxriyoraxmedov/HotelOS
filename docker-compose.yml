@@ -8,7 +8,7 @@ services:
     container_name: hotelos-redis
     ports:
       - "6379:6379"
-    restart: always
+    restart: "no"
 
   # -------------------------
   # Reception Service
@@ -22,7 +22,7 @@ services:
       POSTGRES_DB: reception_db
     ports:
       - "5433:5432"
-    restart: always
+    restart: "no"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U reception_user -d reception_db"]
       interval: 5s
@@ -42,7 +42,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    restart: always
+    restart: "no"
 
   # -------------------------
   # Cleaning Service
@@ -56,7 +56,7 @@ services:
       POSTGRES_DB: cleaning_db
     ports:
       - "5434:5432"
-    restart: always
+    restart: "no"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cleaning_user -d cleaning_db"]
       interval: 5s
@@ -76,7 +76,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    restart: always
+    restart: "no"
 
   # -------------------------
   # Room Service
@@ -90,7 +90,7 @@ services:
       POSTGRES_DB: room_db
     ports:
       - "5435:5432"
-    restart: always
+    restart: "no"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U room_user -d room_db"]
       interval: 5s
@@ -110,7 +110,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    restart: always
+    restart: "no"
 
   # -------------------------
   # Maintenance Service
@@ -124,7 +124,7 @@ services:
       POSTGRES_DB: maintenance_db
     ports:
       - "5436:5432"
-    restart: always
+    restart: "no"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U maintenance_user -d maintenance_db"]
       interval: 5s
@@ -144,7 +144,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    restart: always
+    restart: "no"
 
   # -------------------------
   # API Gateway
@@ -164,7 +164,7 @@ services:
       - cleaning-service
       - room-service
       - maintenance-service
-    restart: always
+    restart: "no"
 
   # -------------------------
   # Dashboard
@@ -179,4 +179,4 @@ services:
     depends_on:
       redis:
         condition: service_started
-    restart: always
+    restart: "no"
